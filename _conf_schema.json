@@ -12,10 +12,10 @@
         "default": false
     },
     "enabled_groups": {
-        "description": "启用回复功能的群聊列表",
+        "description": "使用新对话模式的群聊",
         "type": "list",
         "items": {"type": "string"},
-        "hint": "只有在这个列表中的群聊才会启用回复功能，如果为空则不启用回复功能",
+        "hint": "统一群白名单：保存后新消息生效。列表内自动使用 SpectreCore、跳过口头禅和回复截断；移出列表或停用插件后恢复原有模式，无需在统一权限插件重复填群号。回复所有群聊关闭时生效。",
         "default": []
     },
     "blocked_groups": {

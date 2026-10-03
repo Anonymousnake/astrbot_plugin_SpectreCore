@@ -6,21 +6,25 @@ from pathlib import Path
 from astrbot.api.event import filter
 
 
+def group_mode(event):
+    plugins_dir = str(Path(__file__).resolve().parent.parent)
+    if plugins_dir not in sys.path:
+        sys.path.insert(0, plugins_dir)
+    try:
+        from astrbot_plugin_access_control.dialogue_routing import resolve_group_dialogue_mode
+    except ImportError:
+        return "blocked"
+    return resolve_group_dialogue_mode(event)
+
+
 def allowed(event, config):
+    if not event.is_private_chat():
+        return group_mode(event) == "spectre"
     platform = config.get("platform_id", "")
     if platform and event.get_platform_id() != platform:
         return False
-    if event.is_private_chat():
-        if not config.get("enabled_private", False):
-            return False
-    else:
-        group = str(event.get_group_id() or "")
-        if not group or group in {str(g) for g in config.get("blocked_groups", [])}:
-            return False
-        if not config.get("enable_all_groups", False) and group not in {
-            str(g) for g in config.get("enabled_groups", [])
-        }:
-            return False
+    if not config.get("enabled_private", False):
+        return False
     if config.get("local_access_control", True):
         plugins_dir = str(Path(__file__).resolve().parent.parent)
         if plugins_dir not in sys.path:
@@ -39,7 +43,9 @@ class DialogueFilter(filter.CustomFilter):
     config = {}
 
     def filter(self, event, cfg):
-        if not allowed(event, self.config):
-            return False
         original = str(getattr(event.message_obj, "message_str", "") or event.message_str)
-        return not original.lstrip().startswith("/")
+        if original.lstrip().startswith("/"):
+            return False
+        if event.is_private_chat():
+            return allowed(event, self.config)
+        return group_mode(event) != "legacy"

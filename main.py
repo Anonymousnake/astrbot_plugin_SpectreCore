@@ -2,7 +2,7 @@ from astrbot.api.all import *
 from astrbot.api.event import filter
 from .utils import *
 import time
-from .local_scope import DialogueFilter, allowed
+from .local_scope import DialogueFilter, allowed, group_mode
 
 @register(
     "spectrecore",
@@ -35,10 +35,16 @@ class SpectreCore(Star):
 
     async def _process_message(self, event: AstrMessageEvent):
         """处理消息的通用逻辑：保存历史记录并尝试回复"""
-        if not allowed(event, self.config) or event.get_extra("qq_agent_command_handled"):
+        if event.get_extra("qq_agent_command_handled"):
             return
         # Registered commands, including commands addressed with @, keep ownership.
         if event.get_extra("handlers_parsed_params"):
+            return
+        if not event.is_private_chat() and group_mode(event) == "blocked":
+            event.should_call_llm(True)
+            event.stop_event()
+            return
+        if not allowed(event, self.config):
             return
         if str(event.get_sender_id()) == str(event.get_self_id()):
             return
