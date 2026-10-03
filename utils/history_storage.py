@@ -1,4 +1,5 @@
 import os
+from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 import jsonpickle
 from typing import List
 from astrbot.api.all import *
@@ -23,7 +24,7 @@ class HistoryStorage:
         """初始化配置对象"""
         HistoryStorage.config = config
         # 初始化基础存储路径
-        HistoryStorage.base_storage_path = os.path.join(os.getcwd(), "data", "chat_history")
+        HistoryStorage.base_storage_path = os.path.join(get_astrbot_plugin_data_path(), "astrbot_plugin_SpectreCore", "chat_history")
         HistoryStorage._ensure_dir(HistoryStorage.base_storage_path)
         logger.info(f"消息存储路径初始化: {HistoryStorage.base_storage_path}")
         
@@ -42,7 +43,7 @@ class HistoryStorage:
         """获取存储路径"""
         if not HistoryStorage.base_storage_path:
             # 确保基础路径已初始化，未初始化则初始化一次
-            HistoryStorage.base_storage_path = os.path.join(os.getcwd(), "data", "chat_history")
+            HistoryStorage.base_storage_path = os.path.join(get_astrbot_plugin_data_path(), "astrbot_plugin_SpectreCore", "chat_history")
             HistoryStorage._ensure_dir(HistoryStorage.base_storage_path)
             logger.info(f"消息存储路径初始化: {HistoryStorage.base_storage_path}")
             

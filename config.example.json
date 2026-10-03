@@ -1,0 +1,8 @@
+{
+  "local_access_control": true,
+  "platform_id": "",
+  "enabled_groups": [],
+  "enable_all_groups": false,
+  "enabled_private": false,
+  "ambient_cooldown_seconds": 60
+}

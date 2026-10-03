@@ -133,5 +133,20 @@
                 "default": 7
             }
         }
+    },
+    "local_access_control": {
+        "type": "bool",
+        "description": "使用本机共享访问控制",
+        "default": true
+    },
+    "platform_id": {
+        "type": "string",
+        "description": "平台 ID（留空不限制）",
+        "default": ""
+    },
+    "ambient_cooldown_seconds": {
+        "type": "int",
+        "description": "主动接话最短间隔（秒）",
+        "default": 60
     }
 }

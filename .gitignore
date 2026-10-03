@@ -151,3 +151,9 @@ data/
 temp/
 cache/
 *.tmp
+
+__pycache__/
+*.py[cod]
+*.log
+data/
+.env

@@ -3,6 +3,7 @@ from typing import Dict, Any, Optional
 import random
 import time
 from .llm_utils import LLMUtils
+from ..local_scope import allowed
 
 class ReplyDecision:
     """
@@ -22,6 +23,8 @@ class ReplyDecision:
         Returns:
             是否应该回复
         """
+        if not allowed(event, config):
+            return False
         try:
             # 获取必要信息
             platform_name = event.get_platform_name()
@@ -45,6 +48,12 @@ class ReplyDecision:
                 logger.debug("消息中包含黑名单关键词，不进行回复")
                 return False
             
+            # Explicit mentions and replies bypass ambient probability/cooldown.
+            if event.is_at_or_wake_command:
+                return True
+            last = LLMUtils.get_last_call_time(platform_name, is_private_chat, chat_id)
+            if last and time.time() - last < float(config.get("ambient_cooldown_seconds", 60)):
+                return False
             # 检查配置中的回复规则
             return ReplyDecision._check_reply_rules(event, config)
         except Exception as e:

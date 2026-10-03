@@ -2,6 +2,7 @@ from astrbot.api.all import *
 from astrbot.api.event import filter
 from .utils import *
 import time
+from .local_scope import DialogueFilter, allowed
 
 @register(
     "spectrecore",
@@ -17,11 +18,12 @@ class SpectreCore(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
         self.config = config
+        DialogueFilter.config = config
         # 初始化各个工具类
         HistoryStorage.init(config)
         ImageCaptionUtils.init(context, config)
 
-    @event_message_type(EventMessageType.GROUP_MESSAGE)
+    @filter.custom_filter(DialogueFilter, priority=-10000)
     async def on_group_message(self, event: AstrMessageEvent):
         """处理群消息喵"""
         try:
@@ -31,18 +33,16 @@ class SpectreCore(Star):
         except Exception as e:
             logger.error(f"处理群消息时发生错误: {e}")
 
-    @event_message_type(EventMessageType.PRIVATE_MESSAGE)
-    async def on_private_message(self, event: AstrMessageEvent):
-        """处理私聊消息喵"""
-        try:
-            # 保存用户消息到历史记录并尝试回复
-            async for result in self._process_message(event):
-                yield result
-        except Exception as e:
-            logger.error(f"处理私聊消息时发生错误: {e}")
-            
     async def _process_message(self, event: AstrMessageEvent):
         """处理消息的通用逻辑：保存历史记录并尝试回复"""
+        if not allowed(event, self.config) or event.get_extra("qq_agent_command_handled"):
+            return
+        # Registered commands, including commands addressed with @, keep ownership.
+        if event.get_extra("handlers_parsed_params"):
+            return
+        if str(event.get_sender_id()) == str(event.get_self_id()):
+            return
+        event.should_call_llm(True)  # Suppress the default fallback, even when silent.
         # 过滤空消息(napcat会发送私聊对方正在输入的状态，导致astrbot识别为空消息)
         message_outline = event.get_message_outline()
         if not message_outline or message_outline.strip() == "":
@@ -53,13 +53,20 @@ class SpectreCore(Star):
         await HistoryStorage.process_and_save_user_message(event)
 
         # 尝试自动回复
-        if ReplyDecision.should_reply(event, self.config):
-            async for result in ReplyDecision.process_and_reply(event, self.config, self.context):
-                yield result
+        try:
+            if ReplyDecision.should_reply(event, self.config):
+                event.set_extra("spectrecore_request", True)
+                async for result in ReplyDecision.process_and_reply(event, self.config, self.context):
+                    yield result
+        finally:
+            event.stop_event()
+
 
     @filter.after_message_sent()
     async def after_message_sent(self, event: AstrMessageEvent):
         """处理bot发送的消息喵"""
+        if not event.get_extra("spectrecore_request") or not allowed(event, self.config):
+            return
         try:           
             # 保存机器人消息
             if event._result and hasattr(event._result, "chain"):
@@ -78,18 +85,25 @@ class SpectreCore(Star):
     @filter.on_llm_response(priority=114514)
     async def on_llm_resp(self, event: AstrMessageEvent, resp: LLMResponse):
         """处理大模型回复喵"""
-        logger.debug(f"收到大模型回复喵: {resp}")
+        if not event.get_extra("spectrecore_request") or not allowed(event, self.config):
+            return
+        logger.debug("SpectreCore received an owned LLM response")
         try:
             if resp.role != "assistant":
                 return
             # 只进行文本过滤，不处理读空气逻辑
             resp.completion_text = TextFilter.process_model_text(resp.completion_text, self.config)
+            if resp.completion_text == "<NO_RESPONSE>":
+                # Silence is not an assistant utterance for memory/decorators.
+                event.stop_event()
         except Exception as e:
             logger.error(f"处理大模型回复时发生错误: {e}")
 
     @filter.on_decorating_result()
     async def on_decorating_result(self, event: AstrMessageEvent):
         """在消息发送前处理读空气和模型自主引用喵"""
+        if not event.get_extra("spectrecore_request") or not allowed(event, self.config):
+            return
         try:
             result = event.get_result()
             if result is None or not result.chain:
@@ -124,6 +138,12 @@ class SpectreCore(Star):
     @spectrecore.command("help", alias=['帮助', 'helpme'])
     async def help(self, event: AstrMessageEvent):
         """查看插件的帮助喵"""
+        event.set_extra("qq_agent_command_handled", True)
+        event.should_call_llm(True)
+        if not allowed(event, self.config):
+            event.stop_event()
+            yield event.plain_result("这个会话没开新对话功能。")
+            return
         help_text = (
             "SpectreCore插件帮助文档\n"
             "使用spectrecore或sc作为指令前缀 如/sc help\n"
@@ -143,6 +163,12 @@ class SpectreCore(Star):
     @spectrecore.command("history")
     async def history(self, event: AstrMessageEvent, count: int = 10):
         """查看最近的聊天记录喵，默认10条喵，示例/sc history 5"""
+        event.set_extra("qq_agent_command_handled", True)
+        event.should_call_llm(True)
+        if not allowed(event, self.config):
+            event.stop_event()
+            yield event.plain_result("这个会话没开新对话功能。")
+            return
         try:
             # 获取平台名称
             platform_name = event.get_platform_name()
@@ -195,6 +221,15 @@ class SpectreCore(Star):
     @spectrecore.command("reset")
     async def reset(self, event: AstrMessageEvent, group_id: str | None = None):
         """重置历史记录喵，不带参数重置当前聊天记录，带群号则重置指定群聊记录 如/sc reset 123456"""
+        if group_id and str(group_id) != str(event.get_group_id()):
+            yield event.plain_result("请在目标群内重置该群的对话记录。")
+            return
+        event.set_extra("qq_agent_command_handled", True)
+        event.should_call_llm(True)
+        if not allowed(event, self.config):
+            event.stop_event()
+            yield event.plain_result("这个会话没开新对话功能。")
+            return
         try:
             # 获取平台名称
             platform_name = event.get_platform_name()
@@ -238,6 +273,12 @@ class SpectreCore(Star):
     @spectrecore.command("mute", alias=['闭嘴', 'shutup'])
     async def mute(self, event: AstrMessageEvent, minutes: int = 5):
         """临时禁用自动回复，默认5分钟喵，示例/sc mute 10 或 /sc 闭嘴 3"""
+        event.set_extra("qq_agent_command_handled", True)
+        event.should_call_llm(True)
+        if not allowed(event, self.config):
+            event.stop_event()
+            yield event.plain_result("这个会话没开新对话功能。")
+            return
         try:
             # 计算禁用结束时间
             mute_until = time.time() + (minutes * 60)
@@ -263,6 +304,12 @@ class SpectreCore(Star):
     @spectrecore.command("unmute", alias=['说话', 'speak'])
     async def unmute(self, event: AstrMessageEvent):
         """解除禁用自动回复喵"""
+        event.set_extra("qq_agent_command_handled", True)
+        event.should_call_llm(True)
+        if not allowed(event, self.config):
+            event.stop_event()
+            yield event.plain_result("这个会话没开新对话功能。")
+            return
         try:
             # 检查是否处于静默状态
             mute_info = self.config.get("_temp_mute", {})
@@ -285,6 +332,13 @@ class SpectreCore(Star):
     @spectrecore.command("callllm")
     async def callllm(self, event: AstrMessageEvent):
         """触发一次大模型回复 这是用来开发中测试的喵"""
+        event.set_extra("spectrecore_request", True)
+        event.set_extra("qq_agent_command_handled", True)
+        event.should_call_llm(True)
+        if not allowed(event, self.config):
+            event.stop_event()
+            yield event.plain_result("这个会话没开新对话功能。")
+            return
         try:
             # 调用LLM工具类的方法构建并返回请求
             yield await LLMUtils.call_llm(event, self.config, self.context)
