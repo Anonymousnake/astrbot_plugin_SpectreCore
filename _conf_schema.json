@@ -1,4 +1,10 @@
 {
+    "reply_max_chars": {
+        "description": "群聊回复字数上限",
+        "type": "int",
+        "hint": "限制本插件群聊回复的可见正文，同时缩短送给模型参考的旧机器人长回复。优先保留完整短句；不删除历史、不截短用户消息。0 表示不限制。建议 40–80。",
+        "default": 0
+    },
     "group_msg_history": {
         "description": "输入给大模型的消息数量",
         "type": "int",

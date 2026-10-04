@@ -3,6 +3,7 @@ from astrbot.api.event import filter
 from .utils import *
 import time
 from .local_scope import DialogueFilter, allowed, group_mode
+from .utils.reply_limits import limit_reply
 
 @register(
     "spectrecore",
@@ -102,6 +103,11 @@ class SpectreCore(Star):
             if resp.completion_text == "<NO_RESPONSE>":
                 # Silence is not an assistant utterance for memory/decorators.
                 event.stop_event()
+            elif not event.is_private_chat() and not (resp.tools_call_name or resp.tools_call_args):
+                before = resp.completion_text
+                resp.completion_text = limit_reply(before, int(self.config.get("reply_max_chars", 0)))
+                if resp.completion_text != before:
+                    logger.info("SpectreCore bounded reply: %s -> %s chars", len(before), len(resp.completion_text))
         except Exception as e:
             logger.error(f"处理大模型回复时发生错误: {e}")
 

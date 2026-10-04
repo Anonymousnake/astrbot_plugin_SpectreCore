@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 from .image_caption import ImageCaptionUtils
 from .quote_utils import QuoteUtils
+from .reply_limits import limit_reply
 import asyncio
 import json
 import traceback
@@ -16,7 +17,7 @@ class MessageUtils:
     """
         
     @staticmethod
-    async def format_history_for_llm(history_messages: List[AstrBotMessage], max_messages: int = 20, umo: Optional[str] = None, quote_targets: Optional[Dict[str, Dict[str, Any]]] = None) -> str:
+    async def format_history_for_llm(history_messages: List[AstrBotMessage], max_messages: int = 20, umo: Optional[str] = None, quote_targets: Optional[Dict[str, Dict[str, Any]]] = None, *, bot_id: Optional[str] = None, bot_max_chars: int = 0) -> str:
         """
         将历史消息列表格式化为适合输入给大模型的文本格式
 
@@ -25,6 +26,8 @@ class MessageUtils:
             max_messages: 最大消息数量，默认20条
             umo: unified_msg_origin，用于 UMO 路由
             quote_targets: 可选，传入字典时为可引用的消息编号，并将 {编号: 引用目标} 写入该字典
+            bot_id: Bot sender id; only its historical replies are shortened.
+            bot_max_chars: Visible-character cap for old bot replies; zero disables it.
 
         Returns:
             格式化后的历史消息文本
@@ -58,6 +61,8 @@ class MessageUtils:
             
             # 获取消息内容 (异步调用)
             message_content = await MessageUtils.outline_message_list(msg.message, umo=umo) if hasattr(msg, "message") and msg.message else ""
+            if bot_id and str(sender_id) == str(bot_id):
+                message_content = limit_reply(message_content, bot_max_chars)
             
             # 格式化该条消息
             message_text = ""

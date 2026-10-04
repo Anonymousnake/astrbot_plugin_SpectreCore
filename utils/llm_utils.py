@@ -222,7 +222,10 @@ class LLMUtils:
                     # 回退到排除最后一条
                     history_for_context = history_messages[:-1] if len(history_messages) > 1 else []
                 if history_for_context:
-                    formatted_history = await MessageUtils.format_history_for_llm(history_for_context, max_messages=history_limit, umo=umo, quote_targets=quote_targets)
+                    formatted_history = await MessageUtils.format_history_for_llm(
+                        history_for_context, max_messages=history_limit, umo=umo, quote_targets=quote_targets,
+                        bot_id=event.get_self_id(), bot_max_chars=0 if is_private else int(config.get("reply_max_chars", 0)),
+                    )
                     env_description += "\n\n以下是最近的聊天记录：\n" + formatted_history
                 else:
                     env_description += "\n\n你没看见任何聊天记录，看来最近没有消息。"
@@ -303,6 +306,15 @@ class LLMUtils:
             prompt = event.get_message_outline()
         if current_target:
             current_target["content"] = prompt
+
+        reply_limit = 0 if is_private else int(config.get("reply_max_chars", 0))
+        if reply_limit > 0:
+            system_prompt += (
+                f"\n\n[本轮回复长度]\n可见正文最多{reply_limit}个字符，尽量用一两句说完就停。"
+                "只接当前话茬，不分段写小作文、不逐条反驳、不复述问题或翻旧账。"
+                "历史中的长回复只用于识别话题，不作为本轮篇幅或风格示范。"
+                "引用标记和表情标签不计入正文长度。"
+            )
 
         return event.request_llm(
             prompt=prompt,
