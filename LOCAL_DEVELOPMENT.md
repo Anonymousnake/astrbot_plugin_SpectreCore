@@ -15,3 +15,9 @@ Commands mark ownership; out-of-scope events never collect history or inject lor
 Real configuration and history belong in AstrBot data directories, never this repository.
 Worldbook model writes are disabled; existing long-term memory remains responsible for facts.
 Validate with the control repository scoped-dialogue smoke check before deployment.
+
+Explicit mentions/wake requests bypass ambient busy/probability/cooldown gates and
+wait at AstrBot's native session lock. Scope, mute and keyword bans still apply.
+Busy tracking counts active and queued requests by native UMO, not adapter type.
+Run `python tests/test_reply_concurrency.py` offline; `--native-lock PATH` also
+exercises the installed AstrBot session-lock source without starting the bot.

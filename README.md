@@ -4,7 +4,7 @@
 
 ![SpectreCore](https://avatars.githubusercontent.com/u/129108081?s=48&v=4)
 
-[![version](https://img.shields.io/badge/version-v2.3.1-blue.svg?style=flat-square)](https://github.com/Anonymousnake/astrbot_plugin_SpectreCore)
+[![version](https://img.shields.io/badge/version-v2.3.2-blue.svg?style=flat-square)](https://github.com/Anonymousnake/astrbot_plugin_SpectreCore)
 [![license](https://img.shields.io/badge/license-AGPL--3.0-green.svg?style=flat-square)](LICENSE)
 [![author](https://img.shields.io/badge/author-23q3-orange.svg?style=flat-square)](https://github.com/23q3)
 

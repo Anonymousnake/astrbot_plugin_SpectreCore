@@ -26,15 +26,10 @@ class ReplyDecision:
         if not allowed(event, config):
             return False
         try:
-            # 获取必要信息
-            platform_name = event.get_platform_name()
+            # Match AstrBot's native session-lock identity, including bot instance.
+            platform_name = event.unified_msg_origin
             is_private_chat = event.is_private_chat()
             chat_id = event.get_sender_id() if is_private_chat else event.get_group_id()
-            
-            # 检查是否已有大模型在处理
-            if LLMUtils.is_llm_in_progress(platform_name, is_private_chat, chat_id):
-                logger.debug(f"当前聊天已有大模型处理中，不进行回复")
-                return False
             
             # 检查是否处于临时静默状态
             mute_info = config.get("_temp_mute", {})
@@ -48,9 +43,13 @@ class ReplyDecision:
                 logger.debug("消息中包含黑名单关键词，不进行回复")
                 return False
             
-            # Explicit mentions and replies bypass ambient probability/cooldown.
+            # Explicit requests wait at AstrBot's native lock; never discard as busy.
+            # Scope, mute and blacklist checks still apply before this bypass.
             if event.is_at_or_wake_command:
                 return True
+            if LLMUtils.is_llm_in_progress(platform_name, is_private_chat, chat_id):
+                logger.debug("当前会话有大模型请求处理中或等待中，跳过环境消息")
+                return False
             last = LLMUtils.get_last_call_time(platform_name, is_private_chat, chat_id)
             if last and time.time() - last < float(config.get("ambient_cooldown_seconds", 60)):
                 return False
@@ -195,8 +194,8 @@ class ReplyDecision:
         Yields:
             大模型的回复
         """
-        # 获取必要信息
-        platform_name = event.get_platform_name()
+        # Count active and waiting requests under the same native session identity.
+        platform_name = event.unified_msg_origin
         is_private = event.is_private_chat()
         chat_id = event.get_sender_id() if is_private else event.get_group_id()
 

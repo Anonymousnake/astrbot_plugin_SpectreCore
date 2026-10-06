@@ -15,8 +15,8 @@ class LLMUtils:
     用于构建提示词和调用记录相关功能
     """
     
-    # 使用字典保存每个聊天的大模型调用状态
-    # 格式: {"{platform_name}_{chat_type}_{chat_id}": {"last_call_time": timestamp, "in_progress": True/False}}
+    # 请求状态的命名空间使用原生 UMO，隔离同平台上的不同机器人会话。
+    # pending_count 包含正在处理与原生会话锁中等待的请求，最后一个退出才空闲。
     _llm_call_status: Dict[str, Dict[str, Any]] = {}
     _lock = threading.Lock()  # 用于线程安全的锁
     
@@ -26,7 +26,7 @@ class LLMUtils:
         获取聊天的唯一标识
         
         Args:
-            platform_name: 平台名称
+            platform_name: 状态命名空间；回复决策传入原生 unified_msg_origin
             is_private_chat: 是否为私聊
             chat_id: 聊天ID
             
@@ -39,22 +39,21 @@ class LLMUtils:
     @staticmethod
     def set_llm_in_progress(platform_name: str, is_private_chat: bool, chat_id: str, in_progress: bool = True) -> None:
         """
-        设置大模型调用状态
+        登记或释放一个大模型请求（含等待中的请求）
         
         Args:
-            platform_name: 平台名称
+            platform_name: 状态命名空间；回复决策传入原生 unified_msg_origin
             is_private_chat: 是否为私聊
             chat_id: 聊天ID
-            in_progress: 是否正在进行大模型调用
+            in_progress: True 登记一个请求，False 释放一个请求；每次登记须配对释放
         """
         chat_key = LLMUtils.get_chat_key(platform_name, is_private_chat, chat_id)
         
         with LLMUtils._lock:
-            if chat_key not in LLMUtils._llm_call_status:
-                LLMUtils._llm_call_status[chat_key] = {}
-                
-            LLMUtils._llm_call_status[chat_key]["in_progress"] = in_progress
-            LLMUtils._llm_call_status[chat_key]["last_call_time"] = time.time()
+            status = LLMUtils._llm_call_status.setdefault(chat_key, {})
+            delta = 1 if in_progress else -1
+            status["pending_count"] = max(0, status.get("pending_count", 0) + delta)
+            status["last_call_time"] = time.time()
     
     @staticmethod
     def is_llm_in_progress(platform_name: str, is_private_chat: bool, chat_id: str) -> bool:
@@ -62,7 +61,7 @@ class LLMUtils:
         检查指定聊天是否正在进行大模型调用
         
         Args:
-            platform_name: 平台名称
+            platform_name: 状态命名空间；回复决策传入原生 unified_msg_origin
             is_private_chat: 是否为私聊
             chat_id: 聊天ID
             
@@ -75,7 +74,7 @@ class LLMUtils:
             if chat_key not in LLMUtils._llm_call_status:
                 return False
                 
-            return LLMUtils._llm_call_status[chat_key].get("in_progress", False)
+            return LLMUtils._llm_call_status[chat_key].get("pending_count", 0) > 0
     
     @staticmethod
     def get_last_call_time(platform_name: str, is_private_chat: bool, chat_id: str) -> Optional[float]:
@@ -83,7 +82,7 @@ class LLMUtils:
         获取指定聊天最后一次大模型调用的时间戳
         
         Args:
-            platform_name: 平台名称
+            platform_name: 状态命名空间；回复决策传入原生 unified_msg_origin
             is_private_chat: 是否为私聊
             chat_id: 聊天ID
             
@@ -343,7 +342,7 @@ class LLMUtils:
         清除指定聊天的大模型调用状态
         
         Args:
-            platform_name: 平台名称
+            platform_name: 状态命名空间；回复决策传入原生 unified_msg_origin
             is_private_chat: 是否为私聊
             chat_id: 聊天ID
         """

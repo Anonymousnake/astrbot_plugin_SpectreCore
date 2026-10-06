@@ -11,7 +11,7 @@ from astrbot.api.provider import ProviderRequest
     "spectrecore",
     "23q3",
     "使大模型更好的主动回复群聊中的消息，带来生动和沉浸的群聊对话体验",
-    "2.3.1",
+    "2.3.2",
     "https://github.com/Anonymousnake/astrbot_plugin_SpectreCore"
 )
 class SpectreCore(Star):
