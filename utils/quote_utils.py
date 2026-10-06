@@ -20,10 +20,17 @@ class QuoteUtils:
     EXTRA_KEY = "spectrecore_quote_targets"
     # 匹配所有 [引用:xxx] 形式的标记（包括写错的），保证标记不会被发送出去
     MARKER_PATTERN = re.compile(r"[\[【]\s*引用\s*[:：]([^\]】\n]*)[\]】]")
+    # Only repair a numeric protocol prefix, never an occurrence inside prose.
+    BARE_MARKER_PATTERN = re.compile(r"^\s*引用\s*[:：]\s*([0-9]+)(?=\s|$)")
     # AstrBot 4.19.3 起，消息链中已有引用时不再自动插入引用和 @；更早的版本会重复插入
     MIN_ASTRBOT_VERSION = (4, 19, 3)
 
     _version_supported: Optional[bool] = None
+
+    @staticmethod
+    def normalize_markers(text: str) -> str:
+        """Repair a leading bare marker before length limiting and decoration."""
+        return QuoteUtils.BARE_MARKER_PATTERN.sub(lambda m: f"[引用:{m.group(1)}]", text)
 
     @staticmethod
     def _is_astrbot_supported() -> bool:
@@ -122,22 +129,22 @@ class QuoteUtils:
         需在 on_decorating_result 中调用，此时 AstrBot 还没有插入自己的引用。
         没有有效标记时不做处理：自主引用模式下不引用，必须引用模式下由 AstrBot 引用触发回复的消息
         """
-        targets = event.get_extra(QuoteUtils.EXTRA_KEY)
-        if not targets:
-            return
+        targets = event.get_extra(QuoteUtils.EXTRA_KEY) or {}
 
         chosen = None
         marker_found = False
         for comp in result.chain:
             if not isinstance(comp, Plain) or not comp.text:
                 continue
+            if targets:
+                comp.text = QuoteUtils.normalize_markers(comp.text)
             matches = list(QuoteUtils.MARKER_PATTERN.finditer(comp.text))
             if not matches:
                 continue
             marker_found = True
             for match in matches:
                 number = re.search(r"\d+", match.group(1))
-                if chosen is None and number:
+                if chosen is None and number and number.group() in targets:
                     chosen = number.group()
             comp.text = QuoteUtils.MARKER_PATTERN.sub("", comp.text).strip()
 
@@ -153,6 +160,9 @@ class QuoteUtils:
         target = targets.get(chosen)
         if not target:
             logger.debug(f"模型引用的编号 {chosen} 无效，不插入引用")
+            return
+
+        if any(isinstance(c, Reply) for c in result.chain):
             return
 
         astrbot_config = QuoteUtils._get_astrbot_config(context, event.unified_msg_origin)

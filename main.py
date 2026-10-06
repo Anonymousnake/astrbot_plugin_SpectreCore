@@ -11,7 +11,7 @@ from astrbot.api.provider import ProviderRequest
     "spectrecore",
     "23q3",
     "使大模型更好的主动回复群聊中的消息，带来生动和沉浸的群聊对话体验",
-    "2.3.0",
+    "2.3.1",
     "https://github.com/Anonymousnake/astrbot_plugin_SpectreCore"
 )
 class SpectreCore(Star):
@@ -126,6 +126,8 @@ class SpectreCore(Star):
                 return
             # 只进行文本过滤，不处理读空气逻辑
             resp.completion_text = TextFilter.process_model_text(resp.completion_text, self.config)
+            if event.get_extra(QuoteUtils.EXTRA_KEY):
+                resp.completion_text = QuoteUtils.normalize_markers(resp.completion_text)
             if resp.completion_text == "<NO_RESPONSE>":
                 # Silence is not an assistant utterance for memory/decorators.
                 event.stop_event()
