@@ -2,10 +2,12 @@ from astrbot.api.all import *
 from typing import Dict, List, Optional, Any
 import time
 import threading
+import copy
 from .history_storage import HistoryStorage
 from .message_utils import MessageUtils
 from .quote_utils import QuoteUtils
 from astrbot.api.provider import ProviderRequest
+from .sender_persona import SENDER_GUIDANCE, select_sender_persona
 
 class LLMUtils:
     """
@@ -162,6 +164,14 @@ class LLMUtils:
                 except Exception:
                     pass
 
+            # Select per request, before adding any persona text or examples.
+            selected = select_sender_persona(event, config, context.persona_manager.personas_v3)
+            if selected is not None:
+                persona = selected
+                event.set_extra("spectrecore_sender_persona", selected["name"])
+                logger.info("SpectreCore sender persona: group=%s sender=%s persona=%s",
+                            chat_id, event.get_sender_id(), selected["name"])
+
             if persona:
                 system_prompt = persona.get('prompt', '')
                 if persona.get('_mood_imitation_dialogs_processed'):
@@ -171,7 +181,7 @@ class LLMUtils:
 
                 begin_dialogs = persona.get('_begin_dialogs_processed', [])
                 if begin_dialogs:
-                    contexts.extend(begin_dialogs)
+                    contexts.extend(copy.deepcopy(begin_dialogs))
 
                 logger.debug(f"使用 UMO '{umo}' 对应的人格: '{persona.get('name', 'default')}'")
         except Exception as e:
@@ -315,6 +325,9 @@ class LLMUtils:
                 "历史中的长回复只用于识别话题，不作为本轮篇幅或风格示范。"
                 "引用标记和表情标签不计入正文长度。"
             )
+
+        if not is_private and config.get("sender_persona_rules"):
+            system_prompt += SENDER_GUIDANCE.format(sender_id=event.get_sender_id())
 
         return event.request_llm(
             prompt=prompt,

@@ -4,12 +4,14 @@ from .utils import *
 import time
 from .local_scope import DialogueFilter, allowed, group_mode
 from .utils.reply_limits import limit_reply
+from .utils.sender_persona import SENDER_GUIDANCE, replace_native_persona, select_sender_persona
+from astrbot.api.provider import ProviderRequest
 
 @register(
     "spectrecore",
     "23q3",
     "使大模型更好的主动回复群聊中的消息，带来生动和沉浸的群聊对话体验",
-    "2.2.0",
+    "2.3.0",
     "https://github.com/Anonymousnake/astrbot_plugin_SpectreCore"
 )
 class SpectreCore(Star):
@@ -23,6 +25,30 @@ class SpectreCore(Star):
         # 初始化各个工具类
         HistoryStorage.init(config)
         ImageCaptionUtils.init(context, config)
+
+    @filter.on_llm_request(priority=100000)
+    async def apply_sender_persona(self, event: AstrMessageEvent, req: ProviderRequest):
+        """Cover native group requests such as the empty-mention greeting."""
+        if (event.is_private_chat() or not self.config.get("sender_persona_rules")
+                or event.get_extra("spectrecore_request") or not req.conversation
+                or event.get_extra("qq_agent_command_handled")
+                or event.get_extra("handlers_parsed_params")
+                or not allowed(event, self.config)):
+            return
+        selected = select_sender_persona(event, self.config, self.context.persona_manager.personas_v3)
+        if selected is not None:
+            _, original, _, _ = await self.context.persona_manager.resolve_selected_persona(
+                umo=event.unified_msg_origin,
+                conversation_persona_id=req.conversation.persona_id,
+                platform_name=event.get_platform_name(),
+                provider_settings=self.context.get_config(umo=event.unified_msg_origin).get("provider_settings", {}),
+            )
+            if not replace_native_persona(req, original, selected):
+                logger.warning("SpectreCore could not identify native persona block; request unchanged")
+                return
+            logger.info("SpectreCore native sender persona: group=%s sender=%s persona=%s",
+                        event.get_group_id(), event.get_sender_id(), selected["name"])
+        req.system_prompt = (req.system_prompt or "") + SENDER_GUIDANCE.format(sender_id=event.get_sender_id())
 
     @filter.custom_filter(DialogueFilter, priority=-10000)
     async def on_group_message(self, event: AstrMessageEvent):

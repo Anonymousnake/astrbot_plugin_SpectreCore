@@ -1,4 +1,22 @@
 {
+    "sender_persona_rules": {
+        "description": "指定用户人格",
+        "type": "template_list",
+        "hint": "同一群中按真实 QQ 号选择本轮人格；其他人继续使用群聊人格。仅在本插件已开启的群生效，不修改群会话绑定、模型、记忆或工具权限。按列表顺序使用第一条有效匹配规则；人格已删除时回退到原人格。",
+        "default": [],
+        "templates": {
+            "sender_persona": {
+                "name": "用户人格规则",
+                "hint": "填写 QQ 号并选择已有的人格。",
+                "items": {
+                    "enabled": {"description": "启用规则", "type": "bool", "default": true},
+                    "user_id": {"description": "QQ 号", "type": "string", "default": "", "hint": "精确匹配发言者 QQ 号，不使用昵称、@对象或引用消息的作者。"},
+                    "persona_id": {"description": "使用人格", "type": "string", "default": "", "_special": "select_persona", "hint": "从人格设定中选择；未创建时请先新建人格。"},
+                    "group_ids": {"description": "生效群号（可选）", "type": "list", "items": {"type": "string"}, "default": [], "hint": "留空表示所有已开启 SpectreCore 的群；填写后只在这些群生效，不会自动开启新群。"}
+                }
+            }
+        }
+    },
     "reply_max_chars": {
         "description": "群聊回复字数上限",
         "type": "int",

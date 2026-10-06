@@ -4,7 +4,7 @@
 
 ![SpectreCore](https://avatars.githubusercontent.com/u/129108081?s=48&v=4)
 
-[![version](https://img.shields.io/badge/version-v2.2.0-blue.svg?style=flat-square)](https://github.com/23q3/astrbot_plugin_SpectreCore)
+[![version](https://img.shields.io/badge/version-v2.3.0-blue.svg?style=flat-square)](https://github.com/Anonymousnake/astrbot_plugin_SpectreCore)
 [![license](https://img.shields.io/badge/license-AGPL--3.0-green.svg?style=flat-square)](LICENSE)
 [![author](https://img.shields.io/badge/author-23q3-orange.svg?style=flat-square)](https://github.com/23q3)
 
@@ -63,6 +63,21 @@ SpectreCore (影芯) 是一个为 AstrBot 设计的高级群聊互动插件，�
 3. 打开插件的配置界面，配置好相关选项，即可开始使用
 
 ## 📖 文档
+
+### 指定用户人格（此 fork 的功能）
+
+在 AstrBot「人格设定」中创建所需人格，然后进入「插件 → SpectreCore → 配置 → 指定用户人格」，添加「用户人格规则」：
+
+- **QQ 号**：精确匹配本条消息的发送者，不匹配昵称、@对象或引用消息的作者。
+- **使用人格**：通过内置人格选择器选择已有的人格，无需复制总提示词。
+- **生效群号**：留空表示所有已开启 SpectreCore 的群；填写后只在这些群应用，不会扩大插件白名单。
+- **启用规则**：关闭或删除后立即恢复原来的人格选择。重复匹配按列表顺序取第一条有效规则；不存在的人格会记录警告并跳过。
+
+规则只替换当前请求的人格提示词和示例，不修改群会话绑定、模型、历史记录或工具权限。未匹配用户继续使用原群聊人格；私聊沿用原行为。普通群聊和 AstrBot 原生的“只 @ 不发文字”问候均支持。若其他插件改写了原生人格块而无法安全识别，将记录警告并保留原请求。
+
+群聊历史仍共享，模型可能受到历史语气影响；每轮会提示模型按当前人格回应当前发言者。口头禅、点歌等独立插件的固定回复不由此规则接管。
+
+配置默认无规则。保存配置后新请求生效，不会修改正在生成的回复。
 
 - [指令说明](./docs/commands.md) - 详细的指令用法和参数说明
 - [使用技巧](./docs/tips.md) - 提高插件使用效果的技巧和建议
